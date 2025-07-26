@@ -4,13 +4,50 @@ const cors = require('cors');
 const helmet = require('helmet');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+const validator = require('validator');
 require('dotenv').config();
+
+// Import custom modules
+const EmailIntelAgent = require('./email-intel-agent');
+const EmailParser = require('./email-parser');
+const { ConfigUtils } = require('./config');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Initialize core components
+const emailIntelAgent = new EmailIntelAgent();
+const emailParser = new EmailParser();
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: '15 minutes'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const uploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 uploads per windowMs
+    message: {
+        error: 'Too many uploads from this IP, please try again later.',
+        retryAfter: '15 minutes'
+    }
+});
+
 // Middleware
+app.use(compression()); // Enable gzip compression
+app.use(limiter); // Apply rate limiting to all requests
+
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -21,40 +58,79 @@ app.use(helmet({
             imgSrc: ["'self'", "data:", "https:"],
             connectSrc: ["'self'"]
         }
+    },
+    crossOriginEmbedderPolicy: false // Allow embedding for dashboard
+}));
+
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production'
+        ? ['https://yourdomain.com'] // Replace with your production domain
+        : true,
+    credentials: true,
+    optionsSuccessStatus: 200
+}));
+
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+        // Verify JSON payload integrity
+        try {
+            JSON.parse(buf);
+        } catch (e) {
+            res.status(400).json({ error: 'Invalid JSON payload' });
+            return;
+        }
     }
 }));
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({
+    extended: true,
+    limit: '10mb',
+    parameterLimit: 1000 // Limit number of parameters
+}));
 
 // Serve static files
-app.use(express.static('.'));
+app.use(express.static('.', {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0, // Cache static files in production
+    etag: true,
+    lastModified: true
+}));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = './uploads';
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+    destination: async (req, file, cb) => {
+        try {
+            const uploadDir = './uploads';
+            await fs.mkdir(uploadDir, { recursive: true });
+            cb(null, uploadDir);
+        } catch (error) {
+            cb(error);
         }
-        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
+        // Sanitize filename
+        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, file.fieldname + '-' + uniqueSuffix + '-' + sanitizedName);
     }
 });
 
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+        files: 10, // Maximum 10 files
+        fields: 10 // Maximum 10 fields
     },
     fileFilter: (req, file, cb) => {
         const allowedExtensions = ['.eml', '.msg', '.txt', '.mbox'];
         const fileExtension = path.extname(file.originalname).toLowerCase();
-        
+
+        // Additional security checks
+        if (!file.originalname || file.originalname.length > 255) {
+            return cb(new Error('Invalid filename length'));
+        }
+
         if (allowedExtensions.includes(fileExtension)) {
             cb(null, true);
         } else {
@@ -62,6 +138,43 @@ const upload = multer({
         }
     }
 });
+
+// Enhanced error handling middleware for multer
+const handleMulterError = (error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+        switch (error.code) {
+            case 'LIMIT_FILE_SIZE':
+                return res.status(400).json({
+                    error: 'File too large. Maximum size is 10MB.',
+                    code: 'FILE_TOO_LARGE'
+                });
+            case 'LIMIT_FILE_COUNT':
+                return res.status(400).json({
+                    error: 'Too many files. Maximum is 10 files.',
+                    code: 'TOO_MANY_FILES'
+                });
+            case 'LIMIT_UNEXPECTED_FILE':
+                return res.status(400).json({
+                    error: 'Unexpected file field.',
+                    code: 'UNEXPECTED_FILE'
+                });
+            default:
+                return res.status(400).json({
+                    error: 'File upload error.',
+                    code: 'UPLOAD_ERROR'
+                });
+        }
+    }
+
+    if (error.message.includes('Invalid file type')) {
+        return res.status(400).json({
+            error: error.message,
+            code: 'INVALID_FILE_TYPE'
+        });
+    }
+
+    next(error);
+};
 
 // In-memory storage for demo (in production, use a database)
 let analysisResults = [];
@@ -84,72 +197,134 @@ app.get('/api/health', (req, res) => {
 });
 
 // Upload and analyze emails
-app.post('/api/upload', upload.array('emails', 10), async (req, res) => {
+app.post('/api/upload', uploadLimiter, upload.array('emails', 10), handleMulterError, async (req, res) => {
+    const startTime = Date.now();
+
     try {
+        // Validate request
         if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: 'No files uploaded' });
+            return res.status(400).json({
+                error: 'No files uploaded',
+                code: 'NO_FILES'
+            });
+        }
+
+        // Initialize EmailIntelAgent if not already done
+        if (!emailIntelAgent.isInitialized) {
+            await emailIntelAgent.initialize();
         }
 
         const results = [];
-        
-        for (const file of req.files) {
+        const errors = [];
+
+        // Process files concurrently with limit
+        const processFile = async (file) => {
             try {
-                // Read file content
-                const content = fs.readFileSync(file.path, 'utf8');
-                
+                // Validate file size and type again
+                if (file.size === 0) {
+                    throw new Error('Empty file');
+                }
+
+                // Read file content asynchronously
+                const content = await fs.readFile(file.path, 'utf8');
+
+                // Validate content
+                if (!content || content.trim().length === 0) {
+                    throw new Error('File contains no content');
+                }
+
+                // Parse email using EmailParser
+                const parsedEmail = await emailParser.parseEmail(content, file.originalname);
+
                 // Create email object for analysis
                 const emailObj = {
-                    id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                    id: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     filename: file.originalname,
                     size: file.size,
                     uploadTime: new Date().toISOString(),
-                    content: content
+                    content: content,
+                    parsed: parsedEmail
                 };
 
                 // Store email data
                 emailData.push(emailObj);
 
-                // Simulate analysis (in a real app, this would use the EmailIntelAgent)
-                const analysis = {
-                    id: emailObj.id,
+                // Perform real analysis using EmailIntelAgent
+                const analysis = await emailIntelAgent.analyzeEmail(parsedEmail);
+
+                // Enhance analysis with file metadata
+                analysis.metadata = {
                     filename: file.originalname,
-                    riskScore: Math.floor(Math.random() * 100),
-                    threats: {
-                        phishing: Math.random() > 0.7,
-                        malware: Math.random() > 0.8,
-                        spam: Math.random() > 0.6
-                    },
-                    sentiment: (Math.random() - 0.5) * 2, // -1 to 1
-                    topics: ['business', 'urgent', 'payment'].slice(0, Math.floor(Math.random() * 3) + 1),
-                    timestamp: new Date().toISOString()
+                    fileSize: file.size,
+                    uploadTime: emailObj.uploadTime,
+                    processingTime: Date.now() - startTime
                 };
 
                 analysisResults.push(analysis);
-                results.push(analysis);
 
-                // Clean up uploaded file
-                fs.unlinkSync(file.path);
+                return {
+                    success: true,
+                    filename: file.originalname,
+                    analysis: analysis
+                };
 
             } catch (error) {
-                console.error('Error processing file:', file.originalname, error);
-                results.push({
+                console.error(`Error processing file ${file.originalname}:`, error);
+                return {
+                    success: false,
                     filename: file.originalname,
-                    error: 'Failed to process file'
-                });
+                    error: error.message,
+                    code: 'PROCESSING_ERROR'
+                };
+            } finally {
+                // Clean up uploaded file
+                try {
+                    await fs.unlink(file.path);
+                } catch (unlinkError) {
+                    console.error(`Failed to delete file ${file.path}:`, unlinkError);
+                }
             }
+        };
+
+        // Process files with concurrency limit
+        const concurrencyLimit = 3;
+        for (let i = 0; i < req.files.length; i += concurrencyLimit) {
+            const batch = req.files.slice(i, i + concurrencyLimit);
+            const batchResults = await Promise.all(batch.map(processFile));
+
+            batchResults.forEach(result => {
+                if (result.success) {
+                    results.push(result);
+                } else {
+                    errors.push(result);
+                }
+            });
         }
 
+        const totalProcessingTime = Date.now() - startTime;
+
+        // Return comprehensive response
         res.json({
             success: true,
-            message: `Processed ${results.length} files`,
-            results: results
+            message: `Processed ${results.length} files successfully${errors.length > 0 ? `, ${errors.length} failed` : ''}`,
+            results: results.map(r => r.analysis),
+            errors: errors,
+            metadata: {
+                totalFiles: req.files.length,
+                successfulFiles: results.length,
+                failedFiles: errors.length,
+                processingTime: totalProcessingTime,
+                timestamp: new Date().toISOString()
+            }
         });
 
     } catch (error) {
         console.error('Upload error:', error);
         res.status(500).json({
             error: 'Failed to process upload',
-            message: error.message
+            message: error.message,
+            code: 'UPLOAD_ERROR',
+            timestamp: new Date().toISOString()
         });
     }
 });

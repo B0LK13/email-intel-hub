@@ -1,14 +1,14 @@
 # Email Intel Hub Test Report
-Generated: Sat Jul 26 14:44:03 UTC 2025
+Generated: Sat Jul 26 17:05:58 UTC 2025
 
 ## Server Status
 - Health Check: healthy
 - Version: 1.0.0
 
 ## Performance Metrics
-- Health Endpoint: 0.001057s
-- Stats Endpoint: 0.000916s
-- Dashboard Load: 0.001266s
+- Health Endpoint: 0.001333s
+- Stats Endpoint: 0.001072s
+- Dashboard Load: 0.001911s
 
 ## Test Files
 - sample-bec-email.eml (2059 bytes)
@@ -19,13 +19,13 @@ Generated: Sat Jul 26 14:44:03 UTC 2025
 
 ## Current Statistics
 {
-  "totalEmails": 14,
-  "threatsDetected": 10,
-  "averageRiskScore": 46,
-  "averageSentiment": "0.20",
+  "totalEmails": 11,
+  "threatsDetected": 8,
+  "averageRiskScore": 50,
+  "averageSentiment": "-0.12",
   "threatBreakdown": {
-    "phishing": 5,
-    "malware": 4,
+    "phishing": 3,
+    "malware": 3,
     "spam": 4
   },
   "timeRange": "7d"
