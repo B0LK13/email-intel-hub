@@ -1,0 +1,60 @@
+Return-Path: <suspicious@phishing-example.com>
+Delivered-To: victim@company.com
+Received: by mail.company.com with SMTP id abc123
+	for <victim@company.com>; Sat, 26 Jul 2024 14:30:00 +0000 (UTC)
+From: "Bank Security Team" <suspicious@phishing-example.com>
+To: victim@company.com
+Subject: URGENT: Verify Your Account Immediately - Account Will Be Suspended
+Date: Sat, 26 Jul 2024 14:30:00 +0000
+Message-ID: <fake123@phishing-example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Account Verification Required</title>
+</head>
+<body>
+    <h2>URGENT SECURITY ALERT</h2>
+    
+    <p>Dear Valued Customer,</p>
+    
+    <p>We have detected unusual activity on your account. Your account will be 
+    <strong>SUSPENDED</strong> within 24 hours unless you verify your identity immediately.</p>
+    
+    <p><strong>IMMEDIATE ACTION REQUIRED:</strong></p>
+    <ul>
+        <li>Click the link below to verify your account</li>
+        <li>Enter your login credentials</li>
+        <li>Confirm your identity</li>
+    </ul>
+    
+    <p style="background-color: red; color: white; padding: 10px;">
+        <strong>WARNING: Failure to act within 24 hours will result in permanent account closure!</strong>
+    </p>
+    
+    <p>
+        <a href="http://suspicious-bank-verify.com/login?ref=urgent" 
+           style="background-color: blue; color: white; padding: 10px; text-decoration: none;">
+           VERIFY ACCOUNT NOW
+        </a>
+    </p>
+    
+    <p>If you have any questions, please contact our security team immediately at:</p>
+    <p>Phone: 1-800-FAKE-NUM</p>
+    <p>Email: security@fake-bank.com</p>
+    
+    <p>Thank you for your immediate attention to this matter.</p>
+    
+    <p>Sincerely,<br>
+    Bank Security Team<br>
+    Fraud Prevention Department</p>
+    
+    <hr>
+    <small>
+        This is an automated message. Please do not reply to this email.
+        For security reasons, we will never ask for your password via email.
+    </small>
+</body>
+</html>

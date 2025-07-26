@@ -1,0 +1,115 @@
+{
+  "timestamp": "2025-07-26T17:49:30.773Z",
+  "demoInfo": {
+    "duration": "5.08 seconds",
+    "emailsAnalyzed": 5,
+    "serverStatus": "operational"
+  },
+  "results": [
+    {
+      "file": "sample-email.eml",
+      "result": {
+        "id": "1753552165727-tqs0mpeve",
+        "filename": "sample-email.eml",
+        "riskScore": 15,
+        "threats": {
+          "phishing": true,
+          "malware": false,
+          "spam": false
+        },
+        "sentiment": -0.6708837941399026,
+        "topics": [
+          "business",
+          "urgent",
+          "payment"
+        ],
+        "timestamp": "2025-07-26T17:49:25.727Z"
+      }
+    },
+    {
+      "file": "sample-legitimate-email.eml",
+      "result": {
+        "id": "1753552166734-jij8c5ebs",
+        "filename": "sample-legitimate-email.eml",
+        "riskScore": 98,
+        "threats": {
+          "phishing": false,
+          "malware": false,
+          "spam": false
+        },
+        "sentiment": 0.5089007975795887,
+        "topics": [
+          "business",
+          "urgent"
+        ],
+        "timestamp": "2025-07-26T17:49:26.734Z"
+      }
+    },
+    {
+      "file": "sample-spam-email.eml",
+      "result": {
+        "id": "1753552167741-qyxgmmvfq",
+        "filename": "sample-spam-email.eml",
+        "riskScore": 76,
+        "threats": {
+          "phishing": true,
+          "malware": true,
+          "spam": false
+        },
+        "sentiment": 0.9394066554499187,
+        "topics": [
+          "business",
+          "urgent"
+        ],
+        "timestamp": "2025-07-26T17:49:27.741Z"
+      }
+    },
+    {
+      "file": "sample-bec-email.eml",
+      "result": {
+        "id": "1753552168747-b9vvmglj6",
+        "filename": "sample-bec-email.eml",
+        "riskScore": 48,
+        "threats": {
+          "phishing": false,
+          "malware": true,
+          "spam": false
+        },
+        "sentiment": -0.15918610463977334,
+        "topics": [
+          "business",
+          "urgent"
+        ],
+        "timestamp": "2025-07-26T17:49:28.747Z"
+      }
+    },
+    {
+      "file": "sample-malware-email.eml",
+      "result": {
+        "id": "1753552169751-cp2sknzb8",
+        "filename": "sample-malware-email.eml",
+        "riskScore": 48,
+        "threats": {
+          "phishing": false,
+          "malware": false,
+          "spam": true
+        },
+        "sentiment": 0.11548251417561328,
+        "topics": [
+          "business",
+          "urgent",
+          "payment"
+        ],
+        "timestamp": "2025-07-26T17:49:29.751Z"
+      }
+    }
+  ],
+  "summary": {
+    "avgRiskScore": "57.0",
+    "threatsFound": 4,
+    "sentimentRange": {
+      "min": "-0.67",
+      "max": "0.94"
+    }
+  }
+}
