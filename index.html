@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Intel Hub - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-envelope-open-text"></i>
+                    <h1>Email Intel Hub</h1>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="connectEmailBtn">
+                        <i class="fas fa-plug"></i>
+                        Connect Email
+                    </button>
+                    <button class="btn btn-secondary" id="settingsBtn">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <ul>
+                        <li class="nav-item active">
+                            <a href="#dashboard" class="nav-link">
+                                <i class="fas fa-chart-line"></i>
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#emails" class="nav-link">
+                                <i class="fas fa-inbox"></i>
+                                Email Analysis
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#intelligence" class="nav-link">
+                                <i class="fas fa-brain"></i>
+                                Intelligence
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#reports" class="nav-link">
+                                <i class="fas fa-file-alt"></i>
+                                Reports
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#threats" class="nav-link">
+                                <i class="fas fa-shield-alt"></i>
+                                Threat Detection
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Dashboard Overview -->
+                <section id="dashboard-section" class="content-section active">
+                    <div class="section-header">
+                        <h2>Dashboard Overview</h2>
+                        <div class="time-filter">
+                            <select id="timeRange">
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                                <option value="90d">Last 90 Days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-envelope"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="totalEmails">0</h3>
+                                <p>Total Emails</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="threatsDetected">0</h3>
+                                <p>Threats Detected</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="sentimentScore">0</h3>
+                                <p>Avg Sentiment</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="aiInsights">0</h3>
+                                <p>AI Insights</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts and Analysis -->
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <h3>Email Volume Trends</h3>
+                            <canvas id="emailVolumeChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Threat Analysis</h3>
+                            <canvas id="threatChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="recent-activity">
+                        <h3>Recent Intelligence Activity</h3>
+                        <div class="activity-list" id="activityList">
+                            <!-- Activity items will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Email Analysis Section -->
+                <section id="emails-section" class="content-section">
+                    <div class="section-header">
+                        <h2>Email Analysis</h2>
+                        <button class="btn btn-primary" id="analyzeEmailsBtn">
+                            <i class="fas fa-search"></i>
+                            Analyze New Emails
+                        </button>
+                    </div>
+
+                    <!-- Email Upload -->
+                    <div class="email-upload">
+                        <div class="upload-area" id="emailUploadArea">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drop email files here or click to upload</p>
+                            <input type="file" id="emailFileInput" multiple accept=".eml,.msg,.txt">
+                        </div>
+                    </div>
+
+                    <!-- Email List -->
+                    <div class="email-list">
+                        <div class="email-filters">
+                            <input type="text" id="emailSearch" placeholder="Search emails...">
+                            <select id="emailFilter">
+                                <option value="all">All Emails</option>
+                                <option value="threats">Threats Only</option>
+                                <option value="important">Important</option>
+                                <option value="analyzed">Analyzed</option>
+                            </select>
+                        </div>
+                        <div class="email-items" id="emailItems">
+                            <!-- Email items will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Intelligence Section -->
+                <section id="intelligence-section" class="content-section">
+                    <div class="section-header">
+                        <h2>AI Intelligence Analysis</h2>
+                        <button class="btn btn-primary" id="generateInsightsBtn">
+                            <i class="fas fa-brain"></i>
+                            Generate Insights
+                        </button>
+                    </div>
+
+                    <!-- Intelligence Dashboard -->
+                    <div class="intelligence-grid">
+                        <div class="intelligence-card">
+                            <h3>Sentiment Analysis</h3>
+                            <div id="sentimentAnalysis">
+                                <!-- Sentiment data will be populated -->
+                            </div>
+                        </div>
+                        <div class="intelligence-card">
+                            <h3>Key Topics</h3>
+                            <div id="keyTopics">
+                                <!-- Topics will be populated -->
+                            </div>
+                        </div>
+                        <div class="intelligence-card">
+                            <h3>Communication Patterns</h3>
+                            <div id="communicationPatterns">
+                                <!-- Patterns will be populated -->
+                            </div>
+                        </div>
+                        <div class="intelligence-card">
+                            <h3>Risk Assessment</h3>
+                            <div id="riskAssessment">
+                                <!-- Risk data will be populated -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Email Connection -->
+    <div id="emailConnectionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Connect Email Account</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="emailConnectionForm">
+                    <div class="form-group">
+                        <label for="emailProvider">Email Provider</label>
+                        <select id="emailProvider" required>
+                            <option value="">Select Provider</option>
+                            <option value="gmail">Gmail</option>
+                            <option value="outlook">Outlook</option>
+                            <option value="imap">IMAP (Custom)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="emailAddress">Email Address</label>
+                        <input type="email" id="emailAddress" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="emailPassword">Password/App Password</label>
+                        <input type="password" id="emailPassword" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelConnection">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Connect</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Processing emails with AI...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="config.js"></script>
+    <script src="email-parser.js"></script>
+    <script src="email-intel-agent.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>
