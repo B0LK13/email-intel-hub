@@ -1,0 +1,7 @@
+
+> email-intel-hub@1.0.0 start
+> node server.js
+
+🚀 Email Intel Hub server running on http://localhost:3000
+📊 Dashboard available at http://localhost:3000
+🔧 Environment: development
