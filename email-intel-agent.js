@@ -1,5 +1,12 @@
 // Email Intelligence Agent - AI-powered email analysis and threat detection
 
+const natural = require('natural');
+const sentiment = require('sentiment');
+
+// Import required modules
+const EmailParser = require('./email-parser');
+const { CONFIG, ConfigUtils } = require('./config');
+
 class EmailIntelAgent {
     constructor() {
         this.parser = new EmailParser();
@@ -7,75 +14,260 @@ class EmailIntelAgent {
         this.threatDatabase = new Map();
         this.learningData = [];
         this.isInitialized = false;
+        this.sentimentAnalyzer = new sentiment();
+        this.tokenizer = new natural.WordTokenizer();
+        this.stemmer = natural.PorterStemmer;
+
+        // Performance optimization: Cache frequently used patterns
+        this.compiledPatterns = new Map();
+        this.initializePatterns();
+
+        // Statistics tracking
+        this.stats = {
+            totalAnalyses: 0,
+            threatDetections: 0,
+            averageProcessingTime: 0,
+            cacheHits: 0,
+            cacheMisses: 0
+        };
     }
 
-    // Initialize the agent
+    // Initialize compiled regex patterns for better performance
+    initializePatterns() {
+        this.compiledPatterns.set('email', /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi);
+        this.compiledPatterns.set('url', /(https?:\/\/[^\s]+)/gi);
+        this.compiledPatterns.set('ip', /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g);
+        this.compiledPatterns.set('phone', /(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g);
+        this.compiledPatterns.set('creditCard', /\b(?:\d{4}[-\s]?){3}\d{4}\b/g);
+        this.compiledPatterns.set('ssn', /\b\d{3}-?\d{2}-?\d{4}\b/g);
+    }
+
+    // Initialize the agent with enhanced error handling
     async initialize() {
         try {
-            ConfigUtils.log('info', 'Initializing Email Intel Agent');
-            
+            if (this.isInitialized) {
+                return; // Already initialized
+            }
+
+            console.log('🤖 Initializing Email Intel Agent...');
+
             // Load threat signatures and patterns
             await this.loadThreatSignatures();
-            
+
             // Initialize sentiment analysis
             this.initializeSentimentAnalysis();
-            
+
             // Load machine learning models (simulated)
             await this.loadMLModels();
-            
+
+            // Initialize cache cleanup interval
+            this.setupCacheCleanup();
+
             this.isInitialized = true;
-            ConfigUtils.log('info', 'Email Intel Agent initialized successfully');
+            console.log('✅ Email Intel Agent initialized successfully');
         } catch (error) {
-            ConfigUtils.log('error', 'Failed to initialize Email Intel Agent', error);
-            throw error;
+            console.error('❌ Failed to initialize Email Intel Agent:', error);
+            throw new Error(`Initialization failed: ${error.message}`);
         }
     }
 
-    // Analyze a single email
+    // Setup automatic cache cleanup to prevent memory leaks
+    setupCacheCleanup() {
+        setInterval(() => {
+            const maxCacheSize = 1000;
+            if (this.analysisCache.size > maxCacheSize) {
+                const entries = Array.from(this.analysisCache.entries());
+                const toDelete = entries.slice(0, entries.length - maxCacheSize);
+                toDelete.forEach(([key]) => this.analysisCache.delete(key));
+                console.log(`🧹 Cleaned up ${toDelete.length} cache entries`);
+            }
+        }, 5 * 60 * 1000); // Every 5 minutes
+    }
+
+    // Analyze a single email with enhanced performance and error handling
     async analyzeEmail(email) {
+        const startTime = Date.now();
+
         if (!this.isInitialized) {
             await this.initialize();
         }
 
         try {
-            ConfigUtils.log('info', 'Analyzing email', { subject: email.headers?.subject });
+            // Input validation
+            if (!email || typeof email !== 'object') {
+                throw new Error('Invalid email object provided');
+            }
+
+            // Generate cache key based on email content hash
+            const cacheKey = this.generateCacheKey(email);
+
+            // Check cache first
+            if (this.analysisCache.has(cacheKey)) {
+                this.stats.cacheHits++;
+                console.log(`📋 Cache hit for email analysis: ${cacheKey}`);
+                return this.analysisCache.get(cacheKey);
+            }
+
+            this.stats.cacheMisses++;
+            console.log(`🔍 Analyzing email: ${email.headers?.subject || 'No Subject'}`);
 
             const analysis = {
                 id: this.generateAnalysisId(),
                 timestamp: new Date().toISOString(),
-                email: email,
+                email: this.sanitizeEmailForStorage(email),
                 results: {
-                    threatAssessment: await this.assessThreats(email),
-                    sentimentAnalysis: this.analyzeSentiment(email),
-                    topicExtraction: this.extractTopics(email),
-                    entityRecognition: this.recognizeEntities(email),
-                    communicationPatterns: this.analyzeCommunicationPatterns(email),
                     riskScore: 0,
-                    category: CONFIG.AI.CATEGORIES.LEGITIMATE,
-                    confidence: 0
+                    category: 'legitimate',
+                    confidence: 0,
+                    threats: {},
+                    sentiment: null,
+                    topics: [],
+                    entities: {},
+                    patterns: {},
+                    metadata: {}
                 }
+            };
+
+            // Perform analysis in parallel where possible
+            const [
+                threatAssessment,
+                sentimentAnalysis,
+                topicExtraction,
+                entityRecognition,
+                communicationPatterns
+            ] = await Promise.all([
+                this.assessThreats(email).catch(err => {
+                    console.error('Threat assessment failed:', err);
+                    return { detected: false, confidence: 0, indicators: [], threats: {} };
+                }),
+                this.analyzeSentiment(email).catch(err => {
+                    console.error('Sentiment analysis failed:', err);
+                    return { score: 0, comparative: 0, tokens: [], words: [] };
+                }),
+                this.extractTopics(email).catch(err => {
+                    console.error('Topic extraction failed:', err);
+                    return { topics: [], keywords: [] };
+                }),
+                this.recognizeEntities(email).catch(err => {
+                    console.error('Entity recognition failed:', err);
+                    return { emails: [], urls: [], ips: [], organizations: [], locations: [] };
+                }),
+                this.analyzeCommunicationPatterns(email).catch(err => {
+                    console.error('Communication pattern analysis failed:', err);
+                    return { timing: {}, frequency: {}, behavioral: {} };
+                })
+            ]);
+
+            // Combine results
+            analysis.results = {
+                ...analysis.results,
+                threatAssessment,
+                sentimentAnalysis,
+                topicExtraction,
+                entityRecognition,
+                communicationPatterns
             };
 
             // Calculate overall risk score and category
             analysis.results = await this.calculateOverallAssessment(analysis.results);
 
+            // Add performance metadata
+            const processingTime = Date.now() - startTime;
+            analysis.results.metadata = {
+                processingTime,
+                cacheKey,
+                analysisVersion: '2.0',
+                timestamp: new Date().toISOString()
+            };
+
             // Cache the analysis
-            this.analysisCache.set(analysis.id, analysis);
+            this.analysisCache.set(cacheKey, analysis);
 
-            // Learn from this analysis
-            this.addToLearningData(analysis);
+            // Update statistics
+            this.updateStats(analysis, processingTime);
 
-            ConfigUtils.log('info', 'Email analysis completed', {
-                id: analysis.id,
-                riskScore: analysis.results.riskScore,
-                category: analysis.results.category
-            });
+            // Learn from this analysis (async, don't wait)
+            this.addToLearningData(analysis).catch(err =>
+                console.error('Failed to add to learning data:', err)
+            );
+
+            console.log(`✅ Email analysis completed in ${processingTime}ms - Risk: ${analysis.results.riskScore}/100`);
 
             return analysis;
+
         } catch (error) {
-            ConfigUtils.log('error', 'Error analyzing email', error);
-            throw error;
+            console.error('❌ Email analysis failed:', error);
+
+            // Return a safe fallback analysis
+            return {
+                id: this.generateAnalysisId(),
+                timestamp: new Date().toISOString(),
+                email: this.sanitizeEmailForStorage(email),
+                results: {
+                    riskScore: 0,
+                    category: 'unknown',
+                    confidence: 0,
+                    error: error.message,
+                    metadata: {
+                        processingTime: Date.now() - startTime,
+                        failed: true
+                    }
+                }
+            };
         }
+    }
+
+    // Generate cache key based on email content
+    generateCacheKey(email) {
+        const content = JSON.stringify({
+            subject: email.headers?.subject,
+            from: email.headers?.from,
+            body: email.body?.substring(0, 1000) // First 1000 chars for cache key
+        });
+
+        // Simple hash function
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return `email_${Math.abs(hash)}`;
+    }
+
+    // Sanitize email object for safe storage
+    sanitizeEmailForStorage(email) {
+        return {
+            headers: {
+                subject: email.headers?.subject || '',
+                from: email.headers?.from || '',
+                to: email.headers?.to || '',
+                date: email.headers?.date || ''
+            },
+            body: email.body ? email.body.substring(0, 5000) : '', // Limit body size
+            attachments: email.attachments ? email.attachments.length : 0
+        };
+    }
+
+    // Update performance statistics
+    updateStats(analysis, processingTime) {
+        this.stats.totalAnalyses++;
+        this.stats.averageProcessingTime =
+            (this.stats.averageProcessingTime * (this.stats.totalAnalyses - 1) + processingTime) /
+            this.stats.totalAnalyses;
+
+        if (analysis.results.riskScore > 50) {
+            this.stats.threatDetections++;
+        }
+    }
+
+    // Get performance statistics
+    getStats() {
+        return {
+            ...this.stats,
+            cacheSize: this.analysisCache.size,
+            cacheHitRate: this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses) || 0
+        };
     }
 
     // Analyze multiple emails in batch
@@ -660,7 +852,6 @@ class EmailIntelAgent {
 
         return stats;
     }
-}
 
     // Clear analysis cache
     clearCache() {
